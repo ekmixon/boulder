@@ -59,7 +59,7 @@ def make_client(email=None):
         client.net.account = client.new_account(messages.NewRegistration.from_data(email=email,
             terms_of_service_agreed=True))
     else:
-        raise Exception("Unrecognized terms of service URL %s" % tos)
+        raise Exception(f"Unrecognized terms of service URL {tos}")
     return client
 
 class NoClientError(ValueError):
@@ -84,7 +84,7 @@ def update_email(client, email):
     if email is None:
         raise(EmailRequiredError("update_email requires an email argument"))
     if not email.startswith("mailto:"):
-        email = "mailto:"+ email
+        email = f"mailto:{email}"
     acct = client.net.account
     updatedAcct = acct.update(body=acct.body.update(contact=(email,)))
     return client.update_registration(updatedAcct)
@@ -94,7 +94,7 @@ def get_chall(authz, typ):
     for chall_body in authz.body.challenges:
         if isinstance(chall_body.chall, typ):
             return chall_body
-    raise Exception("No %s challenge found" % typ.typ)
+    raise Exception(f"No {typ.typ} challenge found")
 
 def make_csr(domains):
     key = OpenSSL.crypto.PKey()
@@ -127,7 +127,7 @@ def auth_and_issue(domains, chall_type="dns-01", email=None, cert_output=None, c
     elif chall_type == "tls-alpn-01":
         cleanup = do_tlsalpn_challenges(client, authzs)
     else:
-        raise Exception("invalid challenge type %s" % chall_type)
+        raise Exception(f"invalid challenge type {chall_type}")
 
     try:
         order = client.poll_and_finalize(order)
@@ -202,17 +202,17 @@ def expect_problem(problem_type, func):
         if e.typ == problem_type:
             ok = True
         else:
-            raise Exception("Expected %s, got %s" % (problem_type, e.__str__()))
+            raise Exception(f"Expected {problem_type}, got {e.__str__()}")
     except acme_errors.ValidationError as e:
         for authzr in e.failed_authzrs:
             for chall in authzr.body.challenges:
-                error = chall.error
-                if error and error.typ == problem_type:
-                    ok = True
-                elif error:
-                    raise Exception("Expected %s, got %s" % (problem_type, error.__str__()))
+                if error := chall.error:
+                    if error.typ == problem_type:
+                        ok = True
+                    else:
+                        raise Exception(f"Expected {problem_type}, got {error.__str__()}")
     if not ok:
-        raise Exception('Expected %s, got no error' % problem_type)
+        raise Exception(f'Expected {problem_type}, got no error')
 
 if __name__ == "__main__":
     # Die on SIGINT

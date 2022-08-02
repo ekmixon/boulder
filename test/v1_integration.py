@@ -176,11 +176,11 @@ def test_http_challenge_http_redirect():
         raise(Exception("Unexpected request URL {0} in challtestsrv history: {1}".format(request['URL'], request)))
 
     # There should have been at least 1 initial HTTP-01 validation request.
-    if len(initialRequests) < 1:
+    if not initialRequests:
         raise(Exception("Expected {0} initial HTTP-01 request events on challtestsrv, found {1}".format(validation_attempts, len(initialRequests))))
 
     # There should have been at least 1 redirected HTTP request for each VA
-    if len(redirectedRequests) < 1:
+    if not redirectedRequests:
         raise(Exception("Expected {0} redirected HTTP-01 request events on challtestsrv, found {1}".format(validation_attempts, len(redirectedRequests))))
 
 def test_http_challenge_https_redirect():
@@ -235,15 +235,14 @@ def test_http_challenge_https_redirect():
         raise(Exception("Unexpected request URL {0} in challtestsrv history: {1}".format(request['URL'], request)))
 
     # There should have been at least 1 initial HTTP-01 validation request.
-    if len(initialRequests) < 1:
+    if not initialRequests:
         raise(Exception("Expected {0} initial HTTP-01 request events on challtestsrv, found {1}".format(validation_attempts, len(initialRequests))))
-     # All initial requests should have been over HTTP
     for r in initialRequests:
       if r['HTTPS'] is True:
         raise(Exception("Expected all initial requests to be HTTP"))
 
     # There should have been at least 1 redirected HTTP request for each VA
-    if len(redirectedRequests) < 1:
+    if not redirectedRequests:
         raise(Exception("Expected {0} redirected HTTP-01 request events on challtestsrv, found {1}".format(validation_attempts, len(redirectedRequests))))
     # All the redirected requests should have been over HTTPS with the correct
     # SNI value
@@ -378,7 +377,7 @@ def test_ct_submission():
     def submissions(group):
         count = 0
         for log in group:
-            count += int(requests.get(log + "?hostnames=%s" % hostname).text)
+            count += int(requests.get(log + f"?hostnames={hostname}").text)
         return count
 
     auth_and_issue([hostname])
@@ -402,10 +401,18 @@ def test_expiration_mailer():
 
     requests.post("http://localhost:9381/clear", data='')
     for time in (no_reminder, first_reminder, last_reminder):
-        print(get_future_output(
-            ["./bin/expiration-mailer", "--config", "%s/expiration-mailer.json" % config_dir],
-            time))
-    resp = requests.get("http://localhost:9381/count?to=%s" % email_addr)
+        print(
+            get_future_output(
+                [
+                    "./bin/expiration-mailer",
+                    "--config",
+                    f"{config_dir}/expiration-mailer.json",
+                ],
+                time,
+            )
+        )
+
+    resp = requests.get(f"http://localhost:9381/count?to={email_addr}")
     mailcount = int(resp.text)
     if mailcount != 2:
         raise(Exception("\nExpiry mailer failed: expected 2 emails, got %d" % mailcount))
@@ -526,7 +533,7 @@ def test_account_update():
             raise(Exception("\nUpdate account failed: expected one contact in result, got 0"))
         # We expect it to be the email we just updated to
         actual = result.body.contact[0]
-        if actual != "mailto:"+email:
+        if actual != f"mailto:{email}":
             raise(Exception("\nUpdate account failed: expected contact %s, got %s" % (email, actual)))
 
 def test_renewal_exemption():
@@ -542,20 +549,24 @@ def test_renewal_exemption():
     """
     base_domain = random_domain()
     # First issuance
-    auth_and_issue(["www." + base_domain])
+    auth_and_issue([f"www.{base_domain}"])
     # First Renewal
-    auth_and_issue(["www." + base_domain])
+    auth_and_issue([f"www.{base_domain}"])
     # Issuance of a different cert
-    auth_and_issue(["blog." + base_domain])
+    auth_and_issue([f"blog.{base_domain}"])
     # Renew that one
-    auth_and_issue(["blog." + base_domain])
+    auth_and_issue([f"blog.{base_domain}"])
     # Final, failed issuance, for another different cert
-    chisel.expect_problem("urn:acme:error:rateLimited",
-        lambda: auth_and_issue(["mail." + base_domain]))
+    chisel.expect_problem(
+        "urn:acme:error:rateLimited",
+        lambda: auth_and_issue([f"mail.{base_domain}"]),
+    )
 
 def test_certificates_per_name():
-    chisel.expect_problem("urn:acme:error:rateLimited",
-        lambda: auth_and_issue([random_domain() + ".lim.it"]))
+    chisel.expect_problem(
+        "urn:acme:error:rateLimited",
+        lambda: auth_and_issue([f"{random_domain()}.lim.it"]),
+    )
 
 def test_oversized_csr():
     # Number of names is chosen to be one greater than the configured RA/CA maxNames
@@ -575,9 +586,17 @@ def test_admin_revoker_cert():
     # Revoke certificate by serial
     reset_akamai_purges()
     serial = "%x" % cert.body.get_serial_number()
-    run(["./bin/admin-revoker", "serial-revoke",
-        "--config", "%s/admin-revoker.json" % config_dir,
-        serial, '1'])
+    run(
+        [
+            "./bin/admin-revoker",
+            "serial-revoke",
+            "--config",
+            f"{config_dir}/admin-revoker.json",
+            serial,
+            '1',
+        ]
+    )
+
 
     # Wait for OCSP response to indicate revocation took place
     verify_ocsp(cert_file.name, "/hierarchy/intermediate-cert-rsa-a.pem", "http://localhost:4002", "revoked")
@@ -596,9 +615,18 @@ def test_admin_revoker_batched():
         serialFile.write("%x\n" % cert.body.get_serial_number())
     serialFile.close()
 
-    run(["./bin/admin-revoker", "batched-serial-revoke",
-        "--config", "%s/admin-revoker.json" % config_dir,
-        serialFile.name, '0', '2'])
+    run(
+        [
+            "./bin/admin-revoker",
+            "batched-serial-revoke",
+            "--config",
+            f"{config_dir}/admin-revoker.json",
+            serialFile.name,
+            '0',
+            '2',
+        ]
+    )
+
 
     for cert_file in cert_files:
         verify_ocsp(cert_file.name, "/hierarchy/intermediate-cert-rsa-a.pem", "http://localhost:4002", "revoked")

@@ -122,14 +122,14 @@ def _service_toposort(services):
     No service will be yielded until every service listed in its deps value
     has been yielded.
     """
-    ready = set([s for s in services if not s.deps])
+    ready = {s for s in services if not s.deps}
     blocked = set(services) - ready
     done = set()
     while ready:
         service = ready.pop()
         yield service
         done.add(service.name)
-        new = set([s for s in blocked if all([d in done for d in s.deps])])
+        new = {s for s in blocked if all(d in done for d in s.deps)}
         ready |= new
         blocked -= new
     if blocked:
@@ -148,7 +148,7 @@ challSrvProcess = None
 def setupHierarchy():
     """Set up the issuance hierarchy. Must have called install() before this."""
     e = os.environ.copy()
-    e.setdefault("GOBIN", "%s/bin" % os.getcwd())
+    e.setdefault("GOBIN", f"{os.getcwd()}/bin")
     try:
         subprocess.check_output(["go", "run", "test/cert-ceremonies/generate.go"], env=e)
     except subprocess.CalledProcessError as e:
@@ -200,11 +200,10 @@ def start(fakeclock):
             processes.append(p)
             if service.grpc_addr is not None:
                 waithealth(' '.join(p.args), service.grpc_addr)
-            else:
-                if not waitport(service.debug_port, ' '.join(p.args), perTickCheck=check):
-                    return False
+            elif not waitport(service.debug_port, ' '.join(p.args), perTickCheck=check):
+                return False
         except Exception as e:
-            print("Error starting service %s: %s" % (service.name, e))
+            print(f"Error starting service {service.name}: {e}")
             return False
 
     print("All servers running. Hit ^C to kill.")

@@ -41,9 +41,8 @@ def plot_section(all_data, title, outputPath):
     started = all_data['sent'].min()
     stopped = all_data['finished'].max()
 
-    i = 0
     # plot one row of charts for each endpoint/method combination
-    for section in actions.groups.keys():
+    for i, section in enumerate(actions.groups.keys()):
         # setup the tree charts
         ax = fig.add_subplot(gs[i, 0])
         ax.set_title(section)
@@ -105,8 +104,6 @@ def plot_section(all_data, title, outputPath):
 
         ax3.set_ylabel('Latency quantiles (ms)')
 
-        i += 1
-
     # format x axes
     for ax in fig.axes:
         matplotlib.pyplot.sca(ax)
@@ -126,10 +123,7 @@ parser.add_argument('--title', type=str, help='Chart title')
 args = parser.parse_args()
 
 with open(args.chartData) as data_file:
-    stuff = []
-    for l in data_file.readlines():
-        stuff.append(json.loads(l))
-
+    stuff = [json.loads(l) for l in data_file]
 df = pandas.DataFrame(stuff)
 df['finished'] = pandas.to_datetime(df['finished']).astype(datetime.datetime)
 df['sent'] = pandas.to_datetime(df['sent']).astype(datetime.datetime)

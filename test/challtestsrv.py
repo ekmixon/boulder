@@ -219,7 +219,7 @@ class ChallTestServer:
         _acme-challenge.<host>.
         """
         if host.endswith(".") is False:
-            host = host + "."
+            host = f"{host}."
         return self._postURL(
                 self._URL("add-txt"),
                 { "host": host, "value": value})

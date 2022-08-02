@@ -7,6 +7,7 @@ exceptions: Test cases that don't test either the v1 or v2 API are in this file,
 and test cases that have to run at a specific point in the cycle (e.g. after all
 other test cases) are also in this file.
 """
+
 import argparse
 import datetime
 import inspect
@@ -30,12 +31,7 @@ from helpers import *
 
 from acme import challenges
 
-# Set the environment variable RACE to anything other than 'true' to disable
-# race detection. This significantly speeds up integration testing cycles
-# locally.
-race_detection = True
-if os.environ.get('RACE', 'true') != 'true':
-    race_detection = False
+race_detection = os.environ.get('RACE', 'true') == 'true'
 
 def run_go_tests(filterPattern=None):
     """
@@ -45,8 +41,8 @@ def run_go_tests(filterPattern=None):
     """
     cmdLine = ["go", "test"]
     if filterPattern is not None and filterPattern != "":
-        cmdLine = cmdLine + ["--test.run", filterPattern]
-    cmdLine = cmdLine + ["-tags", "integration", "-count=1", "-race", "./test/integration"]
+        cmdLine += ["--test.run", filterPattern]
+    cmdLine += ["-tags", "integration", "-count=1", "-race", "./test/integration"]
     subprocess.check_call(cmdLine, stderr=subprocess.STDOUT)
 
 def test_single_ocsp():
@@ -76,9 +72,10 @@ def test_stats():
     def expect_stat(port, stat):
         url = "http://localhost:%d/metrics" % port
         response = requests.get(url)
-        if not stat in response.text:
+        if stat not in response.text:
             print(response.content)
-            raise(Exception("%s not present in %s" % (stat, url)))
+            raise Exception(f"{stat} not present in {url}")
+
     expect_stat(8000, "\nresponse_time_count{")
     expect_stat(8000, "\ngo_goroutines ")
     expect_stat(8000, '\ngrpc_client_handling_seconds_count{grpc_method="NewRegistration",grpc_service="ra.RegistrationAuthority",grpc_type="unary"} ')
@@ -208,7 +205,7 @@ def run_chisel(test_case_filter):
 
 def run_loadtest():
     """Run the ACME v2 load generator."""
-    latency_data_file = "%s/integration-test-latency.json" % tempdir
+    latency_data_file = f"{tempdir}/integration-test-latency.json"
 
     # Stop the global pebble-challtestsrv - it will conflict with the
     # load-generator's internal challtestsrv. We don't restart it because
@@ -239,13 +236,13 @@ def check_balance():
         "ra2.boulder:8102",
     ]
     for address in addresses:
-        metrics = requests.get("http://%s/metrics" % address)
-        if not "grpc_server_handled_total" in metrics.text:
+        metrics = requests.get(f"http://{address}/metrics")
+        if "grpc_server_handled_total" not in metrics.text:
             raise(Exception("no gRPC traffic processed by %s; load balancing problem?")
                 % address)
 
 def run_cert_checker():
-    run(["./bin/cert-checker", "-config", "%s/cert-checker.json" % config_dir])
+    run(["./bin/cert-checker", "-config", f"{config_dir}/cert-checker.json"])
 
 if __name__ == "__main__":
     main()

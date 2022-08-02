@@ -77,7 +77,7 @@ def update_email(client, email):
     if email is None:
         raise(EmailRequiredError("update_email requires an email argument"))
     if not email.startswith("mailto:"):
-        email = "mailto:"+ email
+        email = f"mailto:{email}"
     acct = client.account
     updatedAcct = acct.update(body=acct.body.update(contact=(email,)))
     return client.update_registration(updatedAcct)
@@ -86,7 +86,7 @@ def get_chall(authz, typ):
     for chall_body in authz.body.challenges:
         if isinstance(chall_body.chall, typ):
             return chall_body
-    raise(Exception("No %s challenge found" % typ))
+    raise Exception(f"No {typ} challenge found")
 
 class ValidationError(Exception):
     """An error that occurs during challenge validation."""
@@ -96,7 +96,7 @@ class ValidationError(Exception):
         self.detail = detail
 
     def __str__(self):
-        return "%s: %s: %s" % (self.domain, self.problem_type, self.detail)
+        return f"{self.domain}: {self.problem_type}: {self.detail}"
 
 def issue(client, authzs, cert_output=None):
     """Given a list of authzs that are being processed by the server,
@@ -108,13 +108,16 @@ def issue(client, authzs, cert_output=None):
     pkey = OpenSSL.crypto.PKey()
     pkey.generate_key(OpenSSL.crypto.TYPE_RSA, 2048)
     csr = OpenSSL.crypto.X509Req()
-    csr.add_extensions([
-        OpenSSL.crypto.X509Extension(
-            'subjectAltName'.encode(),
-            critical=False,
-            value=(', '.join('DNS:' + d for d in domains)).encode()
-        ),
-    ])
+    csr.add_extensions(
+        [
+            OpenSSL.crypto.X509Extension(
+                'subjectAltName'.encode(),
+                critical=False,
+                value=', '.join(f'DNS:{d}' for d in domains).encode(),
+            )
+        ]
+    )
+
     csr.set_pubkey(pkey)
     csr.set_version(2)
     csr.sign(pkey, 'sha256')
@@ -225,7 +228,7 @@ def auth_and_issue(domains, chall_type="dns-01", email=None, cert_output=None, c
     elif chall_type == "tls-alpn-01":
         cleanup = do_tlsalpn_challenges(client, authzs)
     else:
-        raise(Exception("invalid challenge type %s" % chall_type))
+        raise Exception(f"invalid challenge type {chall_type}")
 
     try:
         cert_resource = issue(client, authzs, cert_output)
@@ -252,7 +255,7 @@ def expect_problem(problem_type, func):
         else:
             raise
     if not ok:
-        raise(Exception('Expected %s, got no error' % problem_type))
+        raise Exception(f'Expected {problem_type}, got no error')
 
 if __name__ == "__main__":
     domains = sys.argv[1:]

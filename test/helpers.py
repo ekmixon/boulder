@@ -61,9 +61,9 @@ def fetch_ocsp(request_bytes, url):
 
     # Make the OCSP request three different ways: by POST, by GET, and by GET with
     # URL-encoded parameters. All three should have an identical response.
-    get_response = requests.get("%s/%s" % (url, ocsp_req_b64)).content
+    get_response = requests.get(f"{url}/{ocsp_req_b64}").content
     get_encoded_response = requests.get("%s/%s" % (url, urllib.parse.quote(ocsp_req_b64, safe = ""))).content
-    post_response = requests.post("%s/" % (url), data=request_bytes).content
+    post_response = requests.post(f"{url}/", data=request_bytes).content
 
     return (post_response, get_response, get_encoded_response)
 
@@ -103,17 +103,20 @@ def verify_ocsp(cert_file, issuer_file, url, status="revoked"):
     # Verify all responses are the same
     for resp in responses:
         if resp != responses[0]:
-            raise(Exception("OCSP responses differed: %s vs %s" %(
-                base64.b64encode(responses[0]), base64.b64encode(resp))))
+            raise Exception(
+                f"OCSP responses differed: {base64.b64encode(responses[0])} vs {base64.b64encode(resp)}"
+            )
+
 
     # Check response is for the correct certificate and is correct
     # status
     resp = responses[0]
     verify_output = ocsp_verify(cert_file, issuer_file, resp)
-    if status is not None:
-        if not re.search("%s: %s" % (cert_file, status), verify_output):
-            print(verify_output)
-            raise(Exception("OCSP response wasn't '%s'" % status))
+    if status is not None and not re.search(
+        f"{cert_file}: {status}", verify_output
+    ):
+        print(verify_output)
+        raise(Exception("OCSP response wasn't '%s'" % status))
     return verify_output
 
 def reset_akamai_purges():
